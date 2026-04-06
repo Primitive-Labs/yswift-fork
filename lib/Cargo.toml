@@ -1,0 +1,31 @@
+[package]
+name = "yniffi"
+version = "0.1.0"
+edition = "2021"
+
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "uniffi-bindgen.rs"
+required-features = ["uniffi/cli"]
+
+[dependencies]
+parking_lot = "0.12"
+pollster = "0.4"
+thiserror = "1.0.38"
+uniffi = "0.27.1"
+yrs = { git = "https://github.com/zshannon/y-crdt.git", branch = "fix/client-id-u64-truncation", features = ["sync"] }
+
+[build-dependencies]
+uniffi = { version = "0.27.1", features = [ "build" ] }
+
+[lib]
+name = "uniffi_yniffi"
+path = "src/lib.rs"
+crate-type = ["staticlib"]

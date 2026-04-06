@@ -1,0 +1,322 @@
+namespace yniffi {};
+
+[Error]
+enum CodingError {
+  "EncodingError",
+  "DecodingError",
+};
+
+[Error]
+enum YrsJsonPathError {
+  "ParseError",
+};
+
+/// Options for creating a YrsDoc with specific configuration.
+dictionary YrsDocOptions {
+    boolean auto_load;
+    u64? client_id;
+    string? guid;
+    boolean should_load;
+};
+
+/// Event emitted when subdocuments are added, loaded, or removed.
+dictionary YrsSubdocsEvent {
+    sequence<YrsDoc> added;
+    sequence<YrsDoc> loaded;
+    sequence<YrsDoc> removed;
+};
+
+/// Delegate for observing document destruction.
+callback interface YrsDestroyObservationDelegate {
+    void call();
+};
+
+/// Delegate for observing subdocument lifecycle changes.
+callback interface YrsSubdocsObservationDelegate {
+    void call(YrsSubdocsEvent event);
+};
+
+/// Event emitted when the document receives an update.
+dictionary YrsUpdateEvent {
+    sequence<u8> update;
+};
+
+/// Delegate for observing document updates.
+callback interface YrsUpdateObservationDelegate {
+    void call(YrsUpdateEvent event);
+};
+
+interface YrsDoc {
+  constructor();
+
+  [Name=new_with_options]
+  constructor(YrsDocOptions options);
+
+  // Identity properties
+  boolean auto_load();
+  u64 client_id();
+  string guid();
+  boolean should_load();
+
+  // Subdoc lifecycle
+  void destroy([ByRef] YrsTransaction parent_txn);
+  void load([ByRef] YrsTransaction parent_txn);
+  YrsDoc? parent_doc();
+  boolean ptr_eq([ByRef] YrsDoc other);
+
+  // Observation
+  YSubscription observe_destroy(YrsDestroyObservationDelegate delegate);
+  YSubscription observe_subdocs(YrsSubdocsObservationDelegate delegate);
+  YSubscription observe_update_v1(YrsUpdateObservationDelegate delegate);
+
+  // Existing methods
+  [Throws=CodingError]
+  sequence<u8> encode_diff_v1([ByRef] YrsTransaction tx, sequence<u8> state_vector);
+
+  YrsArray get_array(string name);
+  YrsMap get_map(string name);
+  YrsText get_text(string name);
+  YrsTransaction transact(YrsOrigin? origin);
+  YrsUndoManager undo_manager(sequence<YrsCollectionPtr> tracked_refs);
+};
+
+interface YrsTransaction {
+  [Throws=CodingError]
+  void transaction_apply_update(sequence<u8> update);
+
+  [Throws=CodingError]
+  sequence<u8> transaction_encode_state_as_update_from_sv(sequence<u8> state_vector);
+
+  sequence<u8> transaction_encode_state_as_update();
+  sequence<u8> transaction_encode_update();
+  sequence<u8> transaction_state_vector();
+  YrsText? transaction_get_text(string name);
+  YrsArray? transaction_get_array(string name);
+  YrsMap? transaction_get_map(string name);
+  YrsOrigin? origin();
+  void free();
+
+  // Subdoc methods
+  sequence<string> subdoc_guids();
+  sequence<YrsDoc> subdocs();
+
+  // JSON path query
+  [Throws=YrsJsonPathError]
+  sequence<string> json_path(string path);
+};
+
+[Custom]
+typedef sequence<u8> YrsOrigin;
+
+[Custom]
+typedef u64 YrsCollectionPtr;
+
+interface YSubscription {
+};
+
+interface YrsMap {
+  YrsCollectionPtr raw_ptr();
+  u32 length([ByRef] YrsTransaction tx);
+  boolean contains_key([ByRef] YrsTransaction tx, string key);
+  void insert([ByRef] YrsTransaction tx, string key, string value);
+
+  [Throws=CodingError]
+  string get([ByRef] YrsTransaction tx, string key);
+
+  [Throws=CodingError]
+  string? remove([ByRef] YrsTransaction tx, string key);
+  void clear([ByRef] YrsTransaction tx);
+  void keys([ByRef] YrsTransaction tx, YrsMapIteratorDelegate delegate);
+  void values([ByRef] YrsTransaction tx, YrsMapIteratorDelegate delegate);
+  void each([ByRef] YrsTransaction tx, YrsMapKVIteratorDelegate delegate);
+
+  YSubscription observe(YrsMapObservationDelegate delegate);
+
+  // Subdoc methods
+  YrsDoc? get_doc([ByRef] YrsTransaction tx, string key);
+  YrsDoc insert_doc([ByRef] YrsTransaction tx, string key, [ByRef] YrsDoc doc);
+
+  // Nested shared type methods
+  YrsArray? get_array([ByRef] YrsTransaction tx, string key);
+  YrsMap? get_map([ByRef] YrsTransaction tx, string key);
+  YrsText? get_text([ByRef] YrsTransaction tx, string key);
+  boolean is_undefined([ByRef] YrsTransaction tx, string key);
+  YrsArray insert_array([ByRef] YrsTransaction tx, string key);
+  YrsMap insert_map([ByRef] YrsTransaction tx, string key);
+  YrsText insert_text([ByRef] YrsTransaction tx, string key);
+  boolean try_update([ByRef] YrsTransaction tx, string key, string value);
+  YrsArray get_or_insert_array([ByRef] YrsTransaction tx, string key);
+  YrsMap get_or_insert_map([ByRef] YrsTransaction tx, string key);
+  YrsText get_or_insert_text([ByRef] YrsTransaction tx, string key);
+};
+
+[Enum]
+interface YrsEntryChange {
+  Inserted(string value);
+  Updated(string old_value, string new_value);
+  Removed(string value);
+};
+
+dictionary YrsMapChange {
+    string key;
+    YrsEntryChange change;
+};
+
+callback interface YrsMapIteratorDelegate {
+    void call(string value);
+};
+
+callback interface YrsMapKVIteratorDelegate {
+    void call(string key, string value);
+};
+
+callback interface YrsMapObservationDelegate {
+    void call(sequence<YrsMapChange> value);
+};
+
+interface YrsArray {
+  YrsCollectionPtr raw_ptr();
+  void each([ByRef] YrsTransaction tx, YrsArrayEachDelegate delegate);
+
+  [Throws=CodingError]
+  string get([ByRef] YrsTransaction tx, u32 index);
+  void insert([ByRef] YrsTransaction tx, u32 index, string value);
+  void insert_range([ByRef] YrsTransaction tx, u32 index, sequence<string> values);
+  u32 length([ByRef] YrsTransaction tx);
+  void push_back([ByRef] YrsTransaction tx, string value);
+  void push_front([ByRef] YrsTransaction tx, string value);
+  void remove([ByRef] YrsTransaction tx, u32 index);
+  void remove_range([ByRef] YrsTransaction tx, u32 index, u32 len);
+  sequence<string> to_a([ByRef] YrsTransaction tx);
+  YSubscription observe(YrsArrayObservationDelegate delegate);
+
+  // Subdoc methods
+  YrsDoc? get_doc([ByRef] YrsTransaction tx, u32 index);
+  YrsDoc insert_doc([ByRef] YrsTransaction tx, u32 index, [ByRef] YrsDoc doc);
+
+  // Nested shared type methods
+  YrsArray? get_array([ByRef] YrsTransaction tx, u32 index);
+  YrsMap? get_map([ByRef] YrsTransaction tx, u32 index);
+  YrsText? get_text([ByRef] YrsTransaction tx, u32 index);
+  boolean is_undefined([ByRef] YrsTransaction tx, u32 index);
+  YrsArray insert_array([ByRef] YrsTransaction tx, u32 index);
+  YrsMap insert_map([ByRef] YrsTransaction tx, u32 index);
+  YrsText insert_text([ByRef] YrsTransaction tx, u32 index);
+  YrsArray push_array([ByRef] YrsTransaction tx);
+  YrsMap push_map([ByRef] YrsTransaction tx);
+  YrsText push_text([ByRef] YrsTransaction tx);
+  void move_to([ByRef] YrsTransaction tx, u32 source, u32 target);
+  void move_range_to([ByRef] YrsTransaction tx, u32 start, u32 end, u32 target);
+};
+
+callback interface YrsArrayEachDelegate {
+    void call(string value);
+};
+
+callback interface YrsArrayObservationDelegate {
+    void call(sequence<YrsChange> value);
+};
+
+[Enum]
+interface YrsChange {
+  Added(sequence<string> elements);
+  Removed(u32 range);
+  Retained(u32 range);
+};
+
+interface YrsText {
+  YrsCollectionPtr raw_ptr();
+  void format([ByRef] YrsTransaction tx, u32 index, u32 length, string attrs);
+  void append([ByRef] YrsTransaction tx, string text);
+  void insert([ByRef] YrsTransaction tx, u32 index, string chunk);
+  void insert_with_attributes([ByRef] YrsTransaction tx, u32 index, string chunk, string attrs);
+  void insert_embed([ByRef] YrsTransaction tx, u32 index, string content);
+  void insert_embed_with_attributes([ByRef] YrsTransaction tx, u32 index, string content, string attrs);
+  string get_string([ByRef] YrsTransaction tx);
+  void remove_range([ByRef] YrsTransaction tx, u32 start, u32 length);
+  u32 length([ByRef] YrsTransaction tx);
+  YSubscription observe(YrsTextObservationDelegate delegate);
+  void apply_delta([ByRef] YrsTransaction tx, sequence<YrsDelta> delta);
+  sequence<YrsDiff> diff([ByRef] YrsTransaction tx);
+};
+
+callback interface YrsTextObservationDelegate {
+    void call(sequence<YrsDelta> value);
+};
+
+[Enum]
+interface YrsDelta {
+  Inserted(string value, string attrs);
+  Deleted(u32 index);
+  Retained(u32 index, string attrs);
+};
+
+[Enum]
+interface YrsDiff {
+  Text(string value, string attrs);
+  Embed(string value, string attrs);
+  Other(string attrs);
+};
+
+/// A manager type able to track changes occurring in a context of a given document.
+/// These changes can be reverted using `undo` method call, or re-applied via `redo`.
+interface YrsUndoManager {
+    /// Adds a specific origin identifier to a list of tracked origins. If tracked
+    /// origin list is not empty, current undo manager will only track changes applied
+    /// over transactions created with a specific origin.
+    void add_origin(YrsOrigin origin);
+
+    /// Removes an existing origin identifier from a list of tracked origins. If tracked
+    /// origin list is not empty, current undo manager will only track changes applied
+    /// over transactions created with a specific origin.
+    void remove_origin(YrsOrigin origin);
+
+    /// Adds a new shared collection to a list of entities observed by current undo manager.
+    void add_scope(YrsCollectionPtr tracked_ref);
+
+    /// Undoes the last operation, pushing it onto redo stack, returning false if undo
+    /// stack was empty an method had no effect.
+    /// Fails to execute if there's another transaction in progress.
+    [Throws=YrsUndoError]
+    boolean undo();
+
+    /// Redoes the last operation from undo stack, returning false if redo stack was
+    /// empty an method had no effect.
+    /// Fails to execute if there's another transaction in progress.
+    [Throws=YrsUndoError]
+    boolean redo();
+
+    /// Wraps a set of recent changes together into a single undo operation. These
+    /// changes will be be undone together on the next `undo` method call.
+    void wrap_changes();
+
+    /// Clears the undo/redo stacks of a current undo manager.
+    [Throws=YrsUndoError]
+    void clear();
+
+    YSubscription observe_added(YrsUndoManagerObservationDelegate delegate);
+
+    YSubscription observe_updated(YrsUndoManagerObservationDelegate delegate);
+
+    YSubscription observe_popped(YrsUndoManagerObservationDelegate delegate);
+};
+
+[Error]
+enum YrsUndoError {
+  "PendingTransaction"
+};
+
+callback interface YrsUndoManagerObservationDelegate {
+    u64 call(YrsUndoEvent e, u64 ptr);
+};
+
+interface YrsUndoEvent {
+    YrsOrigin? origin();
+    YrsUndoEventKind kind();
+    boolean has_changed(YrsCollectionPtr shared_ref);
+};
+
+enum YrsUndoEventKind {
+    "Undo",
+    "Redo",
+};

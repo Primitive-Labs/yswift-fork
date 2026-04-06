@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+
+    runs-on: macos-14
+    env:
+      YSWIFT_LOCAL: true
+
+    steps:
+    - name: Checkout Project
+      uses: actions/checkout@v3
+
+    - name: Show Build Version
+      run: xcodebuild -version
+
+    - name: Build XCFramework
+      run: ./scripts/build-xcframework.sh
+
+    - name: Build YSwift
+      run: swift build
+
+    - name: Test YSwift
+      run: swift test --enable-code-coverage -v
+
+    # - name: Install Mise and Tuist
+    #   uses: jdx/mise-action@v2
+    #   with:
+    #     install: true
+    #     cache: true
+    #     tool_versions: |
+    #       tuist = "3.39.3"
+
+    # - name: Tuist Fetch
+    #   run: |
+    #     cd examples
+    #     tuist fetch
+
+    # - name: Tuist Generate
+    #   run: |
+    #     cd examples
+    #     tuist generate -x -n
+
+    # - name: Tuist Test
+    #   run: |
+    #     cd examples
+    #     tuist build
+

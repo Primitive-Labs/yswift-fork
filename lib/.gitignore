@@ -1,0 +1,18 @@
+.swiftpm
+# *.xcframework — kept checked in so builds don't require Rust
+*.xcodeproj
+*.xcworkspace
+*.zip
+target
+Derived
+swift/wrapper/include/*.modulemap
+
+# documentation generation giblets
+.symbol-graphs/
+Package.resolved
+all_identifiers.txt
+all_symbols.txt
+swift/scaffold/Documentation.docc/.docc-build
+docs/
+.vscode/
+.idea/
