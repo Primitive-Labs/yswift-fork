@@ -298,6 +298,50 @@ public final class YDocument {
         YMap(map: document.getMap(name: named), document: self)
     }
 
+    // MARK: - Transaction-aware factory methods (deadlock-safe)
+
+    // The factory methods above (`getOrCreateText/Array/Map`) call into the
+    // doc-level `getText/getArray/getMap`, which internally call
+    // `transact_mut()` to take yrs's write lock. yrs's lock is NOT reentrant,
+    // so calling those from inside an already-open transaction (e.g. from
+    // within a `transactSync { ... }` closure) will deadlock the calling
+    // thread against itself.
+    //
+    // The methods below take an explicit `YrsTransaction` and route the
+    // get-or-insert through the held `TransactionMut`, so they're safe to
+    // call from inside any open transaction. Use these whenever you need to
+    // lazily get-or-create a top-level shared type during a transaction.
+
+    /// Retrieves or creates a Text shared data type using an existing
+    /// transaction. Safe to call from inside an open transaction.
+    /// - Parameters:
+    ///   - named: The key you use to reference the Text shared data type.
+    ///   - transaction: An existing transaction to use.
+    /// - Returns: The text shared type.
+    public func getOrInsertText(named: String, transaction: YrsTransaction) -> YText {
+        YText(text: transaction.transactionGetOrInsertText(name: named), document: self)
+    }
+
+    /// Retrieves or creates an Array shared data type using an existing
+    /// transaction. Safe to call from inside an open transaction.
+    /// - Parameters:
+    ///   - named: The key you use to reference the Array shared data type.
+    ///   - transaction: An existing transaction to use.
+    /// - Returns: The array shared type.
+    public func getOrInsertArray<T: Codable>(named: String, transaction: YrsTransaction) -> YArray<T> {
+        YArray(array: transaction.transactionGetOrInsertArray(name: named), document: self)
+    }
+
+    /// Retrieves or creates a Map shared data type using an existing
+    /// transaction. Safe to call from inside an open transaction.
+    /// - Parameters:
+    ///   - named: The key you use to reference the Map shared data type.
+    ///   - transaction: An existing transaction to use.
+    /// - Returns: The map shared type.
+    public func getOrInsertMap<T: Codable>(named: String, transaction: YrsTransaction) -> YMap<T> {
+        YMap(map: transaction.transactionGetOrInsertMap(name: named), document: self)
+    }
+
     /// Creates an Undo Manager for a document with the collections that is tracks.
     /// - Parameter trackedRefs: The collections to track to undo and redo changes.
     /// - Returns: A reference to the undo manager to control those actions.

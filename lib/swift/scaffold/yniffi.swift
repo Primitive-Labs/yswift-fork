@@ -1821,6 +1821,12 @@ public protocol YrsTransactionProtocol : AnyObject {
     
     func transactionGetMap(name: String)  -> YrsMap?
     
+    func transactionGetOrInsertArray(name: String)  -> YrsArray
+    
+    func transactionGetOrInsertMap(name: String)  -> YrsMap
+    
+    func transactionGetOrInsertText(name: String)  -> YrsText
+    
     func transactionGetText(name: String)  -> YrsText?
     
     func transactionStateVector()  -> [UInt8]
@@ -1943,6 +1949,30 @@ open func transactionGetArray(name: String) -> YrsArray? {
 open func transactionGetMap(name: String) -> YrsMap? {
     return try!  FfiConverterOptionTypeYrsMap.lift(try! rustCall() {
     uniffi_uniffi_yniffi_fn_method_yrstransaction_transaction_get_map(self.uniffiClonePointer(),
+        FfiConverterString.lower(name),$0
+    )
+})
+}
+    
+open func transactionGetOrInsertArray(name: String) -> YrsArray {
+    return try!  FfiConverterTypeYrsArray.lift(try! rustCall() {
+    uniffi_uniffi_yniffi_fn_method_yrstransaction_transaction_get_or_insert_array(self.uniffiClonePointer(),
+        FfiConverterString.lower(name),$0
+    )
+})
+}
+    
+open func transactionGetOrInsertMap(name: String) -> YrsMap {
+    return try!  FfiConverterTypeYrsMap.lift(try! rustCall() {
+    uniffi_uniffi_yniffi_fn_method_yrstransaction_transaction_get_or_insert_map(self.uniffiClonePointer(),
+        FfiConverterString.lower(name),$0
+    )
+})
+}
+    
+open func transactionGetOrInsertText(name: String) -> YrsText {
+    return try!  FfiConverterTypeYrsText.lift(try! rustCall() {
+    uniffi_uniffi_yniffi_fn_method_yrstransaction_transaction_get_or_insert_text(self.uniffiClonePointer(),
         FfiConverterString.lower(name),$0
     )
 })
@@ -4612,6 +4642,15 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_uniffi_yniffi_checksum_method_yrstransaction_transaction_get_map() != 24782) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_uniffi_yniffi_checksum_method_yrstransaction_transaction_get_or_insert_array() != 10956) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_uniffi_yniffi_checksum_method_yrstransaction_transaction_get_or_insert_map() != 41471) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_uniffi_yniffi_checksum_method_yrstransaction_transaction_get_or_insert_text() != 63689) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_uniffi_yniffi_checksum_method_yrstransaction_transaction_get_text() != 54845) {

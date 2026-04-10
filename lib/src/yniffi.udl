@@ -93,6 +93,14 @@ interface YrsTransaction {
   YrsText? transaction_get_text(string name);
   YrsArray? transaction_get_array(string name);
   YrsMap? transaction_get_map(string name);
+
+  // Get-or-insert (transaction-aware, deadlock-safe).
+  // Operate through the held TransactionMut instead of taking a new doc lock.
+  // Safe to call from inside an open transaction; the doc-level getters are not.
+  YrsText transaction_get_or_insert_text(string name);
+  YrsArray transaction_get_or_insert_array(string name);
+  YrsMap transaction_get_or_insert_map(string name);
+
   YrsOrigin? origin();
   void free();
 

@@ -146,6 +146,36 @@ impl YrsTransaction {
             .map(Arc::from)
     }
 
+    // MARK: - Get-or-insert methods (transaction-aware, deadlock-safe)
+    //
+    // These mirror `YrsDoc::get_text/get_array/get_map` but operate THROUGH the
+    // already-held `TransactionMut` instead of going back to the doc to take
+    // a fresh write lock. The doc-level getters call `transact_mut()` under
+    // the hood, which deadlocks if called while another transaction on the
+    // same doc is still open (yrs's RwLock is not reentrant).
+    //
+    // Use these from inside any `transact { ... }` closure when you need to
+    // get-or-create a top-level shared type lazily, instead of capturing it
+    // before the transaction starts.
+
+    pub(crate) fn transaction_get_or_insert_text(&self, name: String) -> Arc<YrsText> {
+        let mut guard = self.transaction();
+        let tx = guard.as_mut().unwrap();
+        Arc::from(YrsText::from(tx.get_or_insert_text(name.as_str())))
+    }
+
+    pub(crate) fn transaction_get_or_insert_array(&self, name: String) -> Arc<YrsArray> {
+        let mut guard = self.transaction();
+        let tx = guard.as_mut().unwrap();
+        Arc::from(YrsArray::from(tx.get_or_insert_array(name.as_str())))
+    }
+
+    pub(crate) fn transaction_get_or_insert_map(&self, name: String) -> Arc<YrsMap> {
+        let mut guard = self.transaction();
+        let tx = guard.as_mut().unwrap();
+        Arc::from(YrsMap::from(tx.get_or_insert_map(name.as_str())))
+    }
+
     // MARK: - Subdoc methods
 
     /// Returns GUIDs of all subdocuments in this document.
