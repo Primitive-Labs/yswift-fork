@@ -2926,6 +2926,12 @@ public enum YrsEntryChange {
     )
     case removed(value: String
     )
+    case insertedNested(kind: String
+    )
+    case updatedNested(oldKind: String, newKind: String
+    )
+    case removedNested(kind: String
+    )
 }
 
 
@@ -2943,6 +2949,15 @@ public struct FfiConverterTypeYrsEntryChange: FfiConverterRustBuffer {
         )
         
         case 3: return .removed(value: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 4: return .insertedNested(kind: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 5: return .updatedNested(oldKind: try FfiConverterString.read(from: &buf), newKind: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 6: return .removedNested(kind: try FfiConverterString.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -2967,6 +2982,22 @@ public struct FfiConverterTypeYrsEntryChange: FfiConverterRustBuffer {
         case let .removed(value):
             writeInt(&buf, Int32(3))
             FfiConverterString.write(value, into: &buf)
+            
+        
+        case let .insertedNested(kind):
+            writeInt(&buf, Int32(4))
+            FfiConverterString.write(kind, into: &buf)
+            
+        
+        case let .updatedNested(oldKind,newKind):
+            writeInt(&buf, Int32(5))
+            FfiConverterString.write(oldKind, into: &buf)
+            FfiConverterString.write(newKind, into: &buf)
+            
+        
+        case let .removedNested(kind):
+            writeInt(&buf, Int32(6))
+            FfiConverterString.write(kind, into: &buf)
             
         }
     }

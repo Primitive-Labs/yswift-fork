@@ -593,8 +593,17 @@ final class YMapTests: XCTestCase {
         XCTAssertNil(map["nestedMap"], "Nested map should not be in toMap() result")
     }
 
-    func test_observeWithNestedMapDoesNotCrash() {
-        // Test that observe() works when changes involve nested types
+    func test_observeWithNestedMapFiresDistinctNestedEvent() {
+        // Nested-shared-type inserts used to be filtered out of the
+        // change stream entirely (returning `None` from
+        // `mapchange.rs::try_from_entry_change`). That hid record
+        // add/remove events on root maps whose values were nested
+        // per-record Y.Maps, which is exactly the shape model layers
+        // need to observe.
+        //
+        // The new contract: nested-type events surface as
+        // `.insertedNested` / `.updatedNested` / `.removedNested`
+        // with a `kind` tag. Scalar events keep their existing shape.
         let doc = YDocument()
         let root: YMap<String> = doc.getOrCreateMap(named: "root")
 
@@ -603,19 +612,27 @@ final class YMapTests: XCTestCase {
             observedChanges.append(contentsOf: changes)
         }
 
-        // Insert a nested map - should not crash
+        // Insert a nested map — now surfaces as .insertedNested.
         let _: YMap<Int> = root.insertMap(forKey: "nestedMap")
 
-        // Insert a primitive - should trigger observable change
+        // Insert a primitive — still surfaces as .inserted.
         root["primitiveKey"] = "hello"
 
-        // Only primitive change should be observed
-        XCTAssertEqual(observedChanges.count, 1, "Should only observe primitive value changes")
-        if case .inserted(let key, let value) = observedChanges.first {
+        XCTAssertEqual(observedChanges.count, 2,
+                       "Both nested and scalar inserts must surface")
+
+        // Order is insertion order.
+        if case .insertedNested(let key, let kind) = observedChanges[0] {
+            XCTAssertEqual(key, "nestedMap")
+            XCTAssertEqual(kind, "ymap")
+        } else {
+            XCTFail("Expected .insertedNested for nestedMap, got \(observedChanges[0])")
+        }
+        if case .inserted(let key, let value) = observedChanges[1] {
             XCTAssertEqual(key, "primitiveKey")
             XCTAssertEqual(value, "hello")
         } else {
-            XCTFail("Expected inserted change for primitiveKey")
+            XCTFail("Expected .inserted for primitiveKey, got \(observedChanges[1])")
         }
 
         subscription.cancel()

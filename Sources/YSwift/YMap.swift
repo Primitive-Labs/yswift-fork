@@ -474,6 +474,12 @@ class YMapObservationDelegate<T: Codable>: YrsMapObservationDelegate {
                 return YMapChange.updated(key: rsChange.key, oldValue: decoded(oldValue), newValue: decoded(newValue))
             case let .removed(value):
                 return YMapChange.removed(key: rsChange.key, value: decoded(value))
+            case let .insertedNested(kind):
+                return YMapChange.insertedNested(key: rsChange.key, kind: kind)
+            case let .updatedNested(oldKind, newKind):
+                return YMapChange.updatedNested(key: rsChange.key, oldKind: oldKind, newKind: newKind)
+            case let .removedNested(kind):
+                return YMapChange.removedNested(key: rsChange.key, kind: kind)
             }
         }
         callback(result)
@@ -481,13 +487,32 @@ class YMapObservationDelegate<T: Codable>: YrsMapObservationDelegate {
 }
 
 /// A type that represents changes to a Map.
+///
+/// The `*Nested` cases fire when the changed value is a nested
+/// shared type (YMap / YArray / YText / YDoc / ...) rather than a
+/// scalar. The `kind` tag identifies which shared-type slot was
+/// used; the contents of the nested type are NOT carried in the
+/// event — observers that need them should re-read via the
+/// typed accessor (`getMap(forKey:)` / `getArray(forKey:)` / etc.).
+///
+/// Exposing these as distinct cases (rather than dropping them
+/// silently) is what lets model-layer code observe record
+/// add/remove events on a root Y.Map whose values are nested
+/// per-record maps — the load-bearing shape for js-bao-style
+/// per-record observation.
 public enum YMapChange<T> {
-    /// The key and value inserted into the map.
+    /// The key and value inserted into the map (scalar).
     case inserted(key: String, value: T)
-    /// The key, old value, and new value updated in the map.
+    /// The key, old value, and new value updated in the map (scalar).
     case updated(key: String, oldValue: T, newValue: T)
-    /// The key and value removed from the map.
+    /// The key and value removed from the map (scalar).
     case removed(key: String, value: T)
+    /// A nested shared type was inserted at this key.
+    case insertedNested(key: String, kind: String)
+    /// A nested shared type at this key was replaced.
+    case updatedNested(key: String, oldKind: String, newKind: String)
+    /// A nested shared type was removed from this key.
+    case removedNested(key: String, kind: String)
 }
 
 extension YMapChange: Equatable where T: Equatable {
@@ -499,6 +524,12 @@ extension YMapChange: Equatable where T: Equatable {
             return key1 == key2 && oldValue1 == oldValue2 && newValue1 == newValue2
         case let (.removed(key1, value1), .removed(key2, value2)):
             return key1 == key2 && value1 == value2
+        case let (.insertedNested(key1, kind1), .insertedNested(key2, kind2)):
+            return key1 == key2 && kind1 == kind2
+        case let (.updatedNested(key1, oldKind1, newKind1), .updatedNested(key2, oldKind2, newKind2)):
+            return key1 == key2 && oldKind1 == oldKind2 && newKind1 == newKind2
+        case let (.removedNested(key1, kind1), .removedNested(key2, kind2)):
+            return key1 == key2 && kind1 == kind2
         default:
             return false
         }

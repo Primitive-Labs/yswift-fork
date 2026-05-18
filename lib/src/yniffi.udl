@@ -163,6 +163,14 @@ interface YrsEntryChange {
   Inserted(string value);
   Updated(string old_value, string new_value);
   Removed(string value);
+  // Nested shared-type variants — fired when the change value is
+  // a Y.Map / Y.Array / Y.Text / Y.Doc / etc. instead of a scalar.
+  // The `kind` string tags which shared-type slot was used; the
+  // contents of the nested type are not carried in the event —
+  // callers that need them should re-read via the typed accessor.
+  InsertedNested(string kind);
+  UpdatedNested(string old_kind, string new_kind);
+  RemovedNested(string kind);
 };
 
 dictionary YrsMapChange {
