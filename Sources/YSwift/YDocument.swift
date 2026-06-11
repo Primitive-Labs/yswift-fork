@@ -17,6 +17,44 @@ public final class YDocument {
     /// AsyncQueue for Swift 6 concurrency-native APIs (preferred).
     private let asyncQueue = AsyncQueue()
 
+    // MARK: - FFI Exclusion Lock
+    //
+    // yrs (the Rust core) is not safe for concurrent access to one doc:
+    // overlapping transactions — or an observer (de)registration while a
+    // transaction is active on another thread — surface as a Rust panic
+    // (the FFI layer `.expect()`s the store borrow), which aborts the
+    // host process (#1126). The two serialization queues above only
+    // cover their own callers, and code holding `document` directly
+    // bypasses both. `ffiLock` is the single mutual-exclusion domain for
+    // every FFI touch of this doc: held across each transaction's
+    // begin→free and each observer (de)registration, never across an
+    // await — so it cannot deadlock with actor hops or blocked queues.
+    //
+    // Recursive on purpose: observer callbacks fire during commit, i.e.
+    // while the committing thread holds the lock. Same-thread access
+    // from inside a callback keeps today's behavior instead of
+    // deadlocking. Callbacks still must not synchronously open a *write*
+    // transaction (yrs itself rejects the nested borrow) — defer real
+    // work to a queue.
+    //
+    // The lock lives on the wrapper, so it serializes access only for
+    // docs with a single `YDocument` per `YrsDoc` (true throughout
+    // JsBaoClient). Subdocument wrappers from `init(wrapping:)` carry
+    // their own lock.
+    private let ffiLock = NSRecursiveLock()
+
+    /// Run `body` while holding this document's FFI exclusion lock.
+    /// Bracket any direct access to `document` (raw `YrsDoc`
+    /// transactions) with this so it can't overlap a `transactSync` /
+    /// `transact` or an observer (de)registration on another thread.
+    /// `body` must not await and must not block on work that needs this
+    /// lock from another thread.
+    public func withExclusiveAccess<T>(_ body: () throws -> T) rethrows -> T {
+        ffiLock.lock()
+        defer { ffiLock.unlock() }
+        return try body()
+    }
+
     /// Create a new YSwift Document.
     public init() {
         document = YrsDoc()
@@ -90,7 +128,9 @@ public final class YDocument {
     /// - Returns: A subscription that can be used to cancel the observation.
     public func observeSubdocs(_ body: @escaping (YSubdocsEvent) -> Void) -> YSubscription {
         let delegate = YSubdocsObservationDelegateWrapper(callback: body)
-        return YSubscription(subscription: document.observeSubdocs(delegate: delegate))
+        return withExclusiveAccess {
+            YSubscription(subscription: document.observeSubdocs(delegate: delegate), lock: ffiLock)
+        }
     }
 
     /// Returns a publisher that emits subdocument lifecycle events.
@@ -108,7 +148,9 @@ public final class YDocument {
     /// - Returns: A subscription that can be used to cancel the observation.
     public func observeDestroy(_ body: @escaping () -> Void) -> YSubscription {
         let delegate = YDestroyObservationDelegateWrapper(callback: body)
-        return YSubscription(subscription: document.observeDestroy(delegate: delegate))
+        return withExclusiveAccess {
+            YSubscription(subscription: document.observeDestroy(delegate: delegate), lock: ffiLock)
+        }
     }
 
     /// Returns a publisher that emits when this document is destroyed.
@@ -129,7 +171,9 @@ public final class YDocument {
     /// - Returns: A subscription that can be used to cancel the observation.
     public func observeUpdate(_ body: @escaping ([UInt8]) -> Void) -> YSubscription {
         let delegate = YUpdateObservationDelegateWrapper(callback: body)
-        return YSubscription(subscription: document.observeUpdateV1(delegate: delegate))
+        return withExclusiveAccess {
+            YSubscription(subscription: document.observeUpdateV1(delegate: delegate), lock: ffiLock)
+        }
     }
 
     /// Returns a publisher that emits raw update bytes after each transaction.
@@ -225,18 +269,22 @@ public final class YDocument {
     /// - Returns: The value that you return from the closure.
     public func transact<T: Sendable>(origin: Origin? = nil, _ changes: @escaping @Sendable (YrsTransaction) -> T) async -> T {
         await asyncQueue.addOperation { [self] in
-            let transaction = document.transact(origin: origin?.origin)
-            defer { transaction.free() }
-            return changes(transaction)
+            withExclusiveAccess {
+                let transaction = document.transact(origin: origin?.origin)
+                defer { transaction.free() }
+                return changes(transaction)
+            }
         }.value
     }
 
     /// Creates an asynchronous throwing transaction using Swift concurrency.
     public func transact<T: Sendable>(origin: Origin? = nil, _ changes: @escaping @Sendable (YrsTransaction) throws -> T) async throws -> T {
         try await asyncQueue.addOperation { [self] in
-            let transaction = document.transact(origin: origin?.origin)
-            defer { transaction.free() }
-            return try changes(transaction)
+            try withExclusiveAccess {
+                let transaction = document.transact(origin: origin?.origin)
+                defer { transaction.free() }
+                return try changes(transaction)
+            }
         }.value
     }
 
@@ -255,9 +303,11 @@ public final class YDocument {
     public func transactSync<T>(origin: Origin? = nil, _ changes: @escaping (YrsTransaction) -> T) -> T {
         dispatchPrecondition(condition: .notOnQueue(syncQueue))
         return syncQueue.sync {
-            let transaction = document.transact(origin: origin?.origin)
-            defer { transaction.free() }
-            return changes(transaction)
+            withExclusiveAccess {
+                let transaction = document.transact(origin: origin?.origin)
+                defer { transaction.free() }
+                return changes(transaction)
+            }
         }
     }
 
@@ -268,9 +318,11 @@ public final class YDocument {
     public func transactAsync<T>(_ origin: Origin? = nil, _ changes: @escaping (YrsTransaction) -> T, completion: @escaping (T) -> Void) {
         syncQueue.async { [weak self] in
             guard let self = self else { return }
-            let transaction = self.document.transact(origin: origin?.origin)
-            defer { transaction.free() }
-            let result = changes(transaction)
+            let result = self.withExclusiveAccess { () -> T in
+                let transaction = self.document.transact(origin: origin?.origin)
+                defer { transaction.free() }
+                return changes(transaction)
+            }
             completion(result)
         }
     }
