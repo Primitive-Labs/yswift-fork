@@ -1,5 +1,6 @@
 import XCTest
 @testable import YSwift
+import Yniffi
 
 /// Regression tests for Primitive-Labs/js-bao-wss#1126: observer
 /// (de)registration racing a transaction on the same doc from another
@@ -60,4 +61,45 @@ final class ConcurrentAccessTests: XCTestCase {
             subscription.cancel()
         }
     }
+
+    /// The path #1126 actually crashed on: SHARED-TYPE observers —
+    /// DynamicModel's root-map / per-record `YrsMap.observe(delegate:)` —
+    /// not the doc-update observer the tests above cover. Those return raw
+    /// `Yniffi.YSubscription` handles that unobserve on Drop (not the
+    /// lock-aware `YSwift.YSubscription.cancel`), so DynamicModel now drops
+    /// them under `withExclusiveAccess` (deinit + record teardown). This
+    /// stresses that pattern: register a map observer inside a transaction,
+    /// tear it down under the exclusion lock, against concurrent writes on
+    /// the same doc. Pre-fix (raw drop off-lock) this races a transaction
+    /// and SIGABRTs like the others; post-fix it passes.
+    func testSharedTypeObserverTeardownUnderExclusiveAccessDoesNotRaceTransactions() {
+        let doc = YDocument()
+        let iterations = 2_000
+
+        DispatchQueue.concurrentPerform(iterations: iterations) { i in
+            if i % 2 == 0 {
+                // Register under a transaction (FFI lock held), then drop the
+                // raw handle under withExclusiveAccess — mirrors DynamicModel.
+                var sub: Yniffi.YSubscription? = doc.transactSync { txn in
+                    (txn.transactionGetOrInsertMap(name: "m") as YrsMap?)?
+                        .observe(delegate: NoopMapObserver())
+                }
+                doc.withExclusiveAccess {
+                    sub = nil  // Drop → yrs unobserve, serialized vs transactions
+                }
+                _ = sub
+            } else {
+                doc.transactSync { txn in
+                    let text = doc.getOrInsertText(named: "t", transaction: txn)
+                    text.append("x", in: txn)
+                }
+            }
+        }
+    }
+}
+
+/// No-op shared-type observer for the teardown stress test above — stands in
+/// for DynamicModel's RootMapObserver / RecordObserver.
+private final class NoopMapObserver: YrsMapObservationDelegate {
+    func call(value: [YrsMapChange]) {}
 }
