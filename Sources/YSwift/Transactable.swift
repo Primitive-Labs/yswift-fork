@@ -32,12 +32,9 @@ extension Transactable {
         }
     }
 
-    // MARK: - Sync Transaction Helper (Deprecated)
+    // MARK: - Sync Transaction Helper
 
     /// Sync convenience accessor for interacting with shared data types.
-    ///
-    /// - Warning: Deprecated. Use async `withTransaction` instead.
-    @available(*, deprecated, message: "Use async withTransaction instead")
     func withTransactionSync<T>(_ transaction: YrsTransaction? = nil, changes: @escaping (YrsTransaction) -> T) -> T {
         if let transaction = transaction {
             return changes(transaction)
@@ -46,7 +43,7 @@ extension Transactable {
         }
     }
 
-    /// Legacy sync transaction helper - used internally by deprecated sync APIs.
+    /// Sync transaction helper used internally by the sync accessor APIs.
     func withTransaction<T>(_ transaction: YrsTransaction? = nil, changes: @escaping (YrsTransaction) -> T) -> T {
         if let transaction = transaction {
             return changes(transaction)
