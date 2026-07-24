@@ -63,7 +63,7 @@ for await changes in text.observeAsync() {
 - ``YSwift/YText/applyDelta(_:)-3cqxc``
 - ``YSwift/YText/observeAsync()``
 
-### Sync APIs (Deprecated)
+### Sync APIs
 
 - ``YSwift/YText/append(_:in:)``
 - ``YSwift/YText/insert(_:at:in:)``

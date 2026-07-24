@@ -54,7 +54,7 @@ for await changes in map.observeAsync() {
 - ``YSwift/YMap/removeAll()-3hg4c``
 - ``YSwift/YMap/observeAsync()``
 
-### Sync APIs (Deprecated)
+### Sync APIs
 
 - ``YSwift/YMap/subscript(_:)``
 - ``YSwift/YMap/length(transaction:)``

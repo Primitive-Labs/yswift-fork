@@ -60,7 +60,7 @@ for await changes in array.observeAsync() {
 - ``YSwift/YArray/toArrayAsync()``
 - ``YSwift/YArray/observeAsync()``
 
-### Sync APIs (Deprecated)
+### Sync APIs
 
 - ``YSwift/YArray/get(index:transaction:)``
 - ``YSwift/YArray/append(_:transaction:)``

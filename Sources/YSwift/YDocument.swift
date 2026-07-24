@@ -8,13 +8,22 @@ public final class YDocument {
     public let document: YrsDoc
 
     // MARK: - Serialization Queues
-    // Two parallel worlds: sync (deprecated) and async (preferred)
-    // Don't mix - pick one paradigm and stick with it
+    //
+    // Two serialization paths, both first-class: a GCD queue for the sync
+    // API (`transactSync`) and an AsyncQueue for the concurrency-native
+    // async API (`transact`). `ffiLock` (below) is the single lock that
+    // makes every raw-FFI mutation mutually exclusive, so sync and async
+    // callers cannot race the yrs core against each other regardless of
+    // which queue they came from. What the queues do NOT provide is
+    // ordering *across* the two paths: an interleaving of sync and async
+    // operations from different threads has no defined order, so don't
+    // split one logical batch of mutations across both paradigms — keep a
+    // given batch entirely sync or entirely async.
 
-    /// GCD queue for deprecated sync APIs. Will be removed in future version.
+    /// GCD queue backing the synchronous transaction API (`transactSync`).
     private let syncQueue = DispatchQueue(label: "YSwift.YDocument.sync", qos: .userInitiated)
 
-    /// AsyncQueue for Swift 6 concurrency-native APIs (preferred).
+    /// AsyncQueue backing the concurrency-native async transaction API (`transact`).
     private let asyncQueue = AsyncQueue()
 
     // MARK: - FFI Exclusion Lock
@@ -218,11 +227,9 @@ public final class YDocument {
         transaction.subdocs().map { YDocument(wrapping: $0) }
     }
 
-    // MARK: - Subdocument Queries (Deprecated Sync)
+    // MARK: - Subdocument Queries (Sync)
 
     /// Returns the GUIDs of all subdocuments in this document.
-    /// - Warning: Deprecated. Use async `subdocGuidsAsync()` or pass an explicit transaction.
-    @available(*, deprecated, message: "Use async subdocGuidsAsync() instead")
     public func subdocGuids(transaction: YrsTransaction? = nil) -> [String] {
         if let transaction = transaction {
             return transaction.subdocGuids()
@@ -232,8 +239,6 @@ public final class YDocument {
     }
 
     /// Returns all subdocuments in this document.
-    /// - Warning: Deprecated. Use async `subdocsAsync()` or pass an explicit transaction.
-    @available(*, deprecated, message: "Use async subdocsAsync() instead")
     public func subdocs(transaction: YrsTransaction? = nil) -> [YDocument] {
         if let transaction = transaction {
             return transaction.subdocs().map { YDocument(wrapping: $0) }
@@ -260,8 +265,15 @@ public final class YDocument {
 
     /// Creates an asynchronous transaction using Swift concurrency.
     ///
-    /// This is the preferred way to interact with the document. Uses AsyncQueue
-    /// for proper Swift 6 concurrency integration.
+    /// The concurrency-native counterpart to `transactSync`. Both are
+    /// first-class: every raw-FFI mutation runs under `ffiLock`
+    /// (`withExclusiveAccess`), so a sync transaction and an async
+    /// transaction can never race the yrs core against each other. The one
+    /// thing the two paths do not share is ordering — an interleaving of
+    /// sync and async operations from different threads has no defined
+    /// order — so keep a single logical batch of mutations entirely on one
+    /// paradigm rather than splitting it across `transact` and
+    /// `transactSync`.
     ///
     /// - Parameters:
     ///   - origin: Optional origin identifier for this transaction.
@@ -288,18 +300,23 @@ public final class YDocument {
         }.value
     }
 
-    // MARK: - Sync Transaction Methods (Deprecated)
+    // MARK: - Sync Transaction Methods
 
     /// Creates a synchronous transaction and provides that transaction to a trailing closure.
     ///
-    /// - Warning: Deprecated. Use async `transact()` instead. Mixing sync and async
-    ///   transaction methods on the same document will cause race conditions.
+    /// A first-class alternative to the async `transact` for synchronous
+    /// call sites (inherently-sync surfaces like `Equatable`, `count`, and
+    /// `description`, and code that isn't in an async context). Every
+    /// raw-FFI mutation runs under `ffiLock` (`withExclusiveAccess`), so
+    /// sync and async transactions can never race the yrs core against each
+    /// other. The queues do not order operations *across* the two paths,
+    /// though, so keep a single logical batch of mutations entirely sync
+    /// rather than splitting it across `transactSync` and `transact`.
     ///
     /// - Parameters:
     ///   - origin: Optional origin identifier for this transaction.
     ///   - changes: The closure in which you make changes to the document.
     /// - Returns: The value that you return from the closure.
-    @available(*, deprecated, message: "Use async transact() instead. Mixing sync/async causes races.")
     public func transactSync<T>(origin: Origin? = nil, _ changes: @escaping (YrsTransaction) -> T) -> T {
         dispatchPrecondition(condition: .notOnQueue(syncQueue))
         return syncQueue.sync {
@@ -312,9 +329,6 @@ public final class YDocument {
     }
 
     /// Creates an asynchronous transaction with completion handler.
-    ///
-    /// - Warning: Deprecated. Use async `transact()` instead.
-    @available(*, deprecated, message: "Use async transact() instead")
     public func transactAsync<T>(_ origin: Origin? = nil, _ changes: @escaping (YrsTransaction) -> T, completion: @escaping (T) -> Void) {
         syncQueue.async { [weak self] in
             guard let self = self else { return }
@@ -433,11 +447,9 @@ public final class YDocument {
         try transaction.jsonPath(path: path)
     }
 
-    // MARK: - JSON Path Queries (Deprecated Sync)
+    // MARK: - JSON Path Queries (Sync)
 
     /// Queries the document using JSON path syntax.
-    /// - Warning: Deprecated. Use async `queryAsync(_:)` or pass an explicit transaction.
-    @available(*, deprecated, message: "Use async queryAsync(_:) instead")
     public func query(_ path: String, transaction: YrsTransaction? = nil) throws -> [String] {
         if let transaction = transaction {
             return try transaction.jsonPath(path: path)
