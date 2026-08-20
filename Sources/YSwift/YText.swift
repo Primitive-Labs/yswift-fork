@@ -428,7 +428,11 @@ class YTextObservationDelegate: YrsTextObservationDelegate {
 }
 
 /// A change to the text or attributes associated with the text.
-public enum YTextChange {
+///
+/// `@unchecked Sendable`: the associated values are immutable snapshots
+/// decoded from the yrs FFI (`[String: Any]` holds plain JSON-like
+/// values), never shared mutable state.
+public enum YTextChange: @unchecked Sendable {
     /// Inserted string,and any associated attributes.
     case inserted(value: String, attributes: [String: Any])
     /// Deleted characters.
