@@ -4,7 +4,12 @@ import Queue
 import Yniffi
 
 /// YDocument holds YSwift shared data types and coordinates collaboration and changes.
-public final class YDocument {
+///
+/// `@unchecked Sendable`: every FFI touch of the underlying yrs doc is
+/// serialized through `ffiLock` (see below), so the instance is safe to
+/// pass across isolation domains — matching `YArray`/`YMap`/`YText`,
+/// which already declare the same.
+public final class YDocument: @unchecked Sendable {
     public let document: YrsDoc
 
     // MARK: - Serialization Queues
