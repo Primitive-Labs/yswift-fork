@@ -14,7 +14,7 @@ class YSubdocTests: XCTestCase {
         XCTAssertNil(subdoc.parentDocument)
 
         let array: YArray<String> = parentDoc.getOrCreateArray(named: "docs")
-        parentDoc.transactSync { txn in
+        _ = parentDoc.transactSync { txn in
             array.insertSubdoc(at: 0, subdoc, transaction: txn)
         }
 
@@ -93,7 +93,7 @@ class YSubdocTests: XCTestCase {
 
         let subdoc = YDocument(options: YDocumentOptions(guid: "mapped-doc"))
 
-        parentDoc.transactSync { txn in
+        _ = parentDoc.transactSync { txn in
             map.insertSubdoc(subdoc, forKey: "myDoc", transaction: txn)
         }
 
@@ -175,7 +175,7 @@ class YSubdocTests: XCTestCase {
         }
 
         let subdoc = YDocument(options: YDocumentOptions(guid: "observed-doc"))
-        parentDoc.transactSync { txn in
+        _ = parentDoc.transactSync { txn in
             array.insertSubdoc(at: 0, subdoc, transaction: txn)
         }
 
@@ -219,7 +219,7 @@ class YSubdocTests: XCTestCase {
         let subdoc = YDocument(options: YDocumentOptions(guid: "leak-test"))
         let array: YArray<String> = parentDoc.getOrCreateArray(named: "docs")
 
-        parentDoc.transactSync { txn in
+        _ = parentDoc.transactSync { txn in
             array.insertSubdoc(at: 0, subdoc, transaction: txn)
         }
 

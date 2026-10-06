@@ -155,7 +155,11 @@ final class YMapTests: XCTestCase {
         // Create an object (it can be of any type), and hold both
         // a strong and a weak reference to it
         var object = NSObject()
+#if compiler(>=6.2)
+        weak let weakObject = object
+#else
         weak var weakObject = object
+#endif
 
         let subscription = map.observe { [object] changes in
             // Capture the object in the closure (note that we need to use
@@ -178,7 +182,11 @@ final class YMapTests: XCTestCase {
         // Create an object (it can be of any type), and hold both
         // a strong and a weak reference to it
         var object = NSObject()
+#if compiler(>=6.2)
+        weak let weakObject = object
+#else
         weak var weakObject = object
+#endif
 
         let subscription = map.observe { [object] changes in
             // Capture the object in the closure (note that we need to use
@@ -236,7 +244,11 @@ final class YMapTests: XCTestCase {
         // Create an object (it can be of any type), and hold both
         // a strong and a weak reference to it
         var object = NSObject()
+#if compiler(>=6.2)
+        weak let weakObject = object
+#else
         weak var weakObject = object
+#endif
 
         let cancellable = map.observe().sink { [object] changes in
             // Capture the object in the closure (note that we need to use
@@ -263,7 +275,11 @@ final class YMapTests: XCTestCase {
         // Create an object (it can be of any type), and hold both
         // a strong and a weak reference to it
         var object = NSObject()
+#if compiler(>=6.2)
+        weak let weakObject = object
+#else
         weak var weakObject = object
+#endif
 
         let cancellable = map.observe().sink { [object] changes in
             // Capture the object in the closure (note that we need to use

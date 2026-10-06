@@ -146,7 +146,11 @@ class YArrayTests: XCTestCase {
         let localArray: YArray<TestType> = localDocument.getOrCreateArray(named: "test")
 
         var object = NSObject()
+#if compiler(>=6.2)
+        weak let weakObject = object
+#else
         weak var weakObject = object
+#endif
 
         localDocument.transactSync { [object] txn in
             _ = object
@@ -189,7 +193,11 @@ class YArrayTests: XCTestCase {
         // Create an object (it can be of any type), and hold both
         // a strong and a weak reference to it
         var object = NSObject()
+#if compiler(>=6.2)
+        weak let weakObject = object
+#else
         weak var weakObject = object
+#endif
 
         let subscription = array.observe { [object] changes in
             // Capture the object in the closure (note that we need to use
@@ -212,7 +220,11 @@ class YArrayTests: XCTestCase {
         // Create an object (it can be of any type), and hold both
         // a strong and a weak reference to it
         var object = NSObject()
+#if compiler(>=6.2)
+        weak let weakObject = object
+#else
         weak var weakObject = object
+#endif
 
         let subscription = array.observe { [object] changes in
             // Capture the object in the closure (note that we need to use
@@ -258,7 +270,11 @@ class YArrayTests: XCTestCase {
         // Create an object (it can be of any type), and hold both
         // a strong and a weak reference to it
         var object = NSObject()
+#if compiler(>=6.2)
+        weak let weakObject = object
+#else
         weak var weakObject = object
+#endif
 
         let cancellable = array.observe().sink { [object] changes in
             // Capture the object in the closure (note that we need to use
@@ -285,7 +301,11 @@ class YArrayTests: XCTestCase {
         // Create an object (it can be of any type), and hold both
         // a strong and a weak reference to it
         var object = NSObject()
+#if compiler(>=6.2)
+        weak let weakObject = object
+#else
         weak var weakObject = object
+#endif
 
         let cancellable = array.observe().sink { [object] changes in
             // Capture the object in the closure (note that we need to use
