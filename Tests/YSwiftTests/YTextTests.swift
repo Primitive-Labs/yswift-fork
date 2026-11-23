@@ -174,7 +174,11 @@ class YTextTests: XCTestCase {
         // Create an object (it can be of any type), and hold both
         // a strong and a weak reference to it
         var object = NSObject()
+#if compiler(>=6.2)
+        weak let weakObject = object
+#else
         weak var weakObject = object
+#endif
 
         let subscription = text.observe { [object] deltas in
             // Capture the object in the closure (note that we need to use
@@ -197,7 +201,11 @@ class YTextTests: XCTestCase {
         // Create an object (it can be of any type), and hold both
         // a strong and a weak reference to it
         var object = NSObject()
+#if compiler(>=6.2)
+        weak let weakObject = object
+#else
         weak var weakObject = object
+#endif
 
         let subscription = text.observe { [object] deltas in
             // Capture the object in the closure (note that we need to use
@@ -242,7 +250,11 @@ class YTextTests: XCTestCase {
         // Create an object (it can be of any type), and hold both
         // a strong and a weak reference to it
         var object = NSObject()
+#if compiler(>=6.2)
+        weak let weakObject = object
+#else
         weak var weakObject = object
+#endif
 
         let cancellable = text.observe().sink { [object] changes in
             // Capture the object in the closure (note that we need to use
@@ -269,7 +281,11 @@ class YTextTests: XCTestCase {
         // Create an object (it can be of any type), and hold both
         // a strong and a weak reference to it
         var object = NSObject()
+#if compiler(>=6.2)
+        weak let weakObject = object
+#else
         weak var weakObject = object
+#endif
 
         let cancellable = text.observe().sink { [object] changes in
             // Capture the object in the closure (note that we need to use
